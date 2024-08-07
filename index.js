@@ -3,7 +3,7 @@ import * as ConcurrentPromise from "./concurrent-promise.js";
 
 const STARTING_URL = "https://en.m.wikipedia.org/wiki/Avicii";
 
-const MAX_PROCESSED = 5000;
+const MAX_PROCESSED = 1000;
 const MAX_LINKS_PER_PAGE = 50;
 
 const WORKER_CONCURRENCY = 20;
@@ -21,6 +21,17 @@ function now() {
   return new Date().getTime();
 }
 
+const clearLines = (n) => {
+  for (let i = 0; i < n; i++) {
+    //first clear the current line, then clear the previous line
+    const y = i === 0 ? null : -1
+    process.stdout.moveCursor(0, y)
+    process.stdout.clearLine(1)
+  }
+  process.stdout.cursorTo(0)
+}
+
+
 async function main() {
   const queue = [STARTING_URL];
   const seen = new Set(queue);
@@ -32,15 +43,19 @@ async function main() {
 
   const startTime = now();
 
+  let stdoutDirty = false;
   function onProgress({pending, total, timeout}) {
     const memoryUsage = (process.memoryUsage.rss() / (1024 * 1024)).toFixed(1);
     maxMemoryUsage = Math.max(maxMemoryUsage, memoryUsage);
 
     const cpuUsage = (process.cpuUsage().user / 1000000).toFixed(1);
 
-    process.stdout.clearLine(0);
-    process.stdout.cursorTo(0);
-    process.stdout.write(`[${now()-startTime}ms] — [${maxMemoryUsage}MB][${cpuUsage}s] — [Batches] Pending: ${pending}, Timed out: ${timeout}, total: ${total} — [Queue] Processed: ${totalProcessed}, Deduped: ${totalDeduped}, Length: ${queue.length} — [Value] ${totalValue}`);
+    clearLines(stdoutDirty ? 5 : 0);
+    stdoutDirty = true;
+    console.log(`[${now()-startTime}ms] — [${maxMemoryUsage}MB][${cpuUsage}s]`);
+    console.log(`[Batches] Pending: ${pending}, Timed out: ${timeout}, total: ${total}`);
+    console.log(`[Queue] Processed: ${totalProcessed}, Deduped: ${totalDeduped}, Length: ${queue.length}`);
+    console.log(`[Value] ${totalValue}`);
   }
 
   function onDo() {
